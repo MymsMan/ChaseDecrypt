@@ -1,0 +1,10 @@
+
+if {[file exists "$dir/.chasedecrypt"]} {
+    lappend icons [_addicon "/plugin/chasedecrypt/img/chasedecrypt.png" "ChaseDecrypt"]
+    lappend attrs "chasedecrypt=1"
+}
+
+#if {[file exists "$dir/.nochasedecrypt"]} {
+#    lappend icons [_addicon "/plugin/chasedecrypt/img/nochasedecrypt.png" "No ChaseDecrypt"]
+#    lappend attrs "nochasedecrypt=1"
+#}

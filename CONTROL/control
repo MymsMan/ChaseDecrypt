@@ -1,0 +1,10 @@
+Package: chasedecrypt
+Priority: optional
+Section: misc
+Version: 0.1.0-0
+Architecture: mipsel
+Maintainer: mymsman
+Depends: webif(>=1.4.0), chaseget(>=0.1.1-6), procps
+Description: Decrypts recordings whilst recording is still in progress
+
+Tags: http://wiki.hummy.tv/wiki/ChaseDecrypt

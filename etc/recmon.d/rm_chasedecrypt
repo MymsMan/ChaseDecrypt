@@ -1,0 +1,50 @@
+#!/mod/bin/jimsh
+
+source /mod/webif/lib/setup
+
+source /mod/webif/plugin/chasedecrypt/chasedecrypt.jim
+require lock system.class ts.class pretty_size browse.class \
+    safe_delete settings.class plugin
+
+set logfile "/mod/tmp/chasedecrypt.log"
+set settings [settings]
+if {[lindex $argv 0] eq "-d"} {
+        set argv [lrange $argv 1 end]
+        set loglevel 2
+        set logfd stdout
+        puts "DEBUG ON"
+} else {
+        set loglevel [$settings _nval_setting "autolog"]
+        set logfd [open $logfile "a+"]
+}
+
+proc log {msg {level 1}} {
+        if {$level > $::loglevel} return
+        puts $::logfd "[\
+                clock format [clock seconds] -format "%d/%m/%Y %H:%M:%S"\
+                ] RM([pid])- $msg"
+        flush $::logfd
+}
+
+
+set settings [settings]
+if {[lindex $argv 0] eq "-d"} {
+        set argv [lrange $argv 1 end]
+        set loglevel 2
+        puts "DEBUG ON"
+} else {
+        set loglevel [$settings _nval_setting "autolog"]
+}
+
+if {[lindex $argv 0] ne "-start"} {
+        exit
+}
+
+log "Recmon: $argv" 2
+
+set file [lindex $argv 1]
+set ts [ts fetch "$file.ts"]
+::chasedecrypt::chancheck $ts
+
+
+

@@ -1,0 +1,26 @@
+#!/mod/bin/jimsh
+# frontend edit/edit/jim to ensure file is editable
+package require cgi
+source /mod/webif/lib/setup
+
+httpheader
+
+set file [cgi_get file .temp]
+puts "Prep file $file"
+
+set fileok 0
+if {[file exists "$file"] } {
+  set hand [open $file]
+  set data [read $hand 20]
+  #puts "data $data"
+  if {[string length $data] > 0} { set fileok 1}
+  close $hand
+}
+
+if {! $fileok} {
+    file copy -force [file tail $file] $file
+    puts 'Initialized $file'
+}
+
+#cd /mod/webif/html/edit
+#puts [exec /mod/webif/html/edit/edit.jim]

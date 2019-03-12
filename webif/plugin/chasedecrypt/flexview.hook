@@ -1,0 +1,18 @@
+# Icon name / icon
+lappend plugins(icons) "chasedecrypt"
+lappend plugins(icons) [_addicon "/plugin/chasedecrypt/img/chasedecrypt.png" "Chase Decryption"]
+
+
+# Directory tree column - see jqGrid documentation for column options
+lappend plugins(dircolumn) {
+{ name:'chasedecrypt',
+  hidden:false, width:22,
+  stype: 'select',
+  searchoptions: {value: {1:"ChaseDecrypt",0:"No ChaseDecrypt",'':"-  &nbsp;  All"}, searchOperMenu: false, clearSearch: false},
+  label: icons.chasedecrypt + ' ChaseDecrypt',
+  formatter: fmtIcon, formatoptions: {img: icons.chasedecrypt}
+  },
+}
+
+# Map browse context menu attributes to flexview column
+lappend plugins(dmenuattr)  "chasedecrypt" "chasedecrypt"

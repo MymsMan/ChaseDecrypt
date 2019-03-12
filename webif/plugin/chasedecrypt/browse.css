@@ -1,0 +1,18 @@
+
+.contextMenu li.chasedecrypt a
+{
+    background-image: url(/plugin/chasedecrypt/img/chasedecrypt.png);
+    background-size: 16px 16px;
+}
+ .contextMenu li.editchasedecrypt a
+{
+    background-image: url(/plugin/chasedecrypt/img/edit.png);
+    background-size: 16px 16px;
+}
+
+
+.contextMenu li.nochasedecrypt a
+{
+    background-image: url(/plugin/chasedecrypt/img/nochasedecrypt.png);
+    background-size: 16px 16px;
+}

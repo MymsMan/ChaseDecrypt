@@ -1,0 +1,346 @@
+proc ::chasedecrypt::delete_orphans {} {
+    if {![catch {exec /mod/bin/pgrep -x chaseget }]} {return}
+    set fl [glob -nocomplain "/mod/tmp/*-inp.ts" "/mod/tmp/*-dec.ts"]
+    log "orphan file list $fl" 2
+    foreach file $fl {
+        if {![system inuse $file]} {
+            set bname [file rootname $file]
+            file delete -force $bname.hmt
+            file delete -force $bname.nts
+            file delete -force $file
+            log "Deleted orphan file $file"
+        }
+    }
+}
+
+# Parse command options and apply defaults
+proc ::chasedecrypt::checkopts {argv}  {
+
+    set ::optlist ""
+    set ::opt "-h"
+    set ::debug 0
+    set parmerror 0
+
+    set settings [settings]
+
+    set ::autologlevel [$settings _nval_setting "autolog"]
+
+    # List of options with default values
+    set optarray {
+      delorig    0
+      misrdsec   0
+      delsec   210 }
+
+    # Override default from settings DB
+    foreach {key defvalue} [array get optarray] {
+        set ::opts($key) [$settings _nval_setting "chasedecrypt_$key"]
+        if {$::opts($key)==0} {set ::opts($key) $defvalue}
+    }
+
+    # Handle text setting for oher options
+    set otheropts [$settings _tval_setting "chasedecrypt_otheropts"]
+
+    # Parse argument lists
+    foreach argl [list $otheropts $argv] {
+        #set ::optlist ""
+        log "arg list $argl" 2
+        for {set ix 0} {$ix < [llength $argl]} {incr ix} {
+            set arg [lindex $argl $ix]
+
+            #check if option in optarray list
+            if {[string range $arg 0 0] == "-"} {
+               set argx [string tolower [string range $arg 1 end]]
+               if {[dict exists $optarray $argx]} {
+                    incr ix
+                    set val [lindex $argl $ix]
+                    set nval $val
+                    if {$val eq "y"} {set nval 1}
+                    if {$val eq "n"} {set nval 0}
+                    if {![string is double -strict $nval]} {
+                        log "Option $arg value ($val) is not y, n or numeric" 0
+                        incr ix -1
+                        set parmerror 1
+                        continue
+                    }
+                    lappend ::optlist $arg
+                    lappend ::optlist $val
+                    set ::opts($argx) $nval
+                    #puts "found -$argx value $val"
+                    continue
+               }
+            }
+
+            # check other options
+            switch -- $arg {
+
+            -debug -
+            -d {
+                    set ::debug 1
+                    set ::loglevel 2
+                    set ::auto::loglevel 2
+                    lappend ::optlist $arg
+               }
+
+
+            default {
+                    log "Unrecognized option: $arg" 0
+                    set parmerror 1
+                    continue
+               }
+            }
+
+        }
+    }
+    if {$parmerror} {
+        log "Parameter errors found"
+        exit
+    }
+
+}
+
+proc ::chasedecrypt::chancheck {ts} {
+    # Check recording channel against inclusion list prior to queueing for analysis
+    set file [$ts get file]
+    set channel [$ts get channel_name]
+
+    log "  ChaseDecrypt: Checking $file ($channel) for inclusion" 0
+
+    set dir  [file dirname $file]
+    #if {[file exists "$dir/.autonochasedecrypt"]} {
+    #    log "  ChaseDecrypt: No Ad-detection folder flag set $file" 0
+    #    return 0
+    #}
+
+    if {![$ts flag "ODEncrypted"]} {
+        log "  ChaseDecrypt: Already decrypted $file" 0
+        return 0
+    }
+
+    # ignore FlatView directory
+    set settings [settings]
+    set fvdir [$settings _tval_setting "fv_dir"]
+
+    if {[file tail $dir] == $fvdir} {
+        log "  ChaseDecrypt: Flat view directory, skipping $file" 0
+        return 0
+    }
+
+    set decOK 0
+    set opts ""
+    if {![file exists "$dir/.chasedecrypt"]} {
+        # open and read configuration file
+        set cf "/mod/etc/chasedecrypt.conf"
+
+        if {![file exists $cf]} {
+            file copy /mod/webif/plugin/chasedecrypt/default.conf $cf
+        }
+
+        if {![catch {set fp [open $cf r]}]} {
+            set clist [split [read $fp] "\n"]
+        } else {
+            set clist {}
+        }
+
+        # Match channel against exclusion list
+        foreach chan $clist {
+            if {![string length $chan]} continue
+            log "Checking exclusion entry: $chan" 2
+            if {[string match -nocase $chan $channel]} {
+                log "Matched inclusion entry $chan" 0
+                set decOK 1
+                break
+            }
+        }
+    } else {
+        # Read options from .chasedecrypt file
+        set decOK 1
+        set ado_file "$dir/.chasedecrypt"
+        set hand [open $ado_file]
+        set opts [gets $hand]
+        close $hand
+    }
+
+    ::chasedecrypt::checkopts $opts
+
+    if {$decOK} {
+            ::chasedecrypt::chaserun $ts
+    } else {
+            log "  ChaseDecrypt: $file not eligible for chase decryption" 0
+    }
+}
+
+
+proc ::chasedecrypt::chaserun {ts} {
+    # run decryption against currently recording program using dlna helper
+    set file [$ts get file]
+
+    log "==ChaseDecrypt Chase Run: $file $::optlist" 0
+    set retcode "OK"
+    set retmsg  "Unknown = check log"
+    set qtime 0
+    set warning ""
+    set cropcmd " "
+
+    # Check for and delete any oprhaned files
+    ::chasedecrypt::delete_orphans
+
+    set statustok [system startop -multiple chasedecrypt $file]
+    set size [$ts size]
+    set numAdBreaks 0
+
+    # set each option from settings/overrides
+    foreach {key value} [array get ::opts] {
+        set $key $value
+    }
+
+    set stime [$ts get start]
+    set etime [$ts get end]
+    set ctime [clock seconds]
+
+    # Check file sharing enabled
+    if {[system param DMS_START_ON]} {
+        log "Content Sharing Enabled" 2
+    } else {
+        puts "Content Sharing Disabled -cannot decrypt files"
+        log "Content Sharing Disabled" 0
+        return {"FAILED" "Content Sharing Disabled"}
+    }
+
+    set bname [file rootname [file tail $file]]
+    set iname "$bname-inp"
+    set tname "$bname-dec"
+    set bpath [file dirname $file]
+    set tpath $bpath
+    set ipath "/mod/tmp"
+    #set tpath "/mod/tmp"
+    set bfile "$file"
+    set ifile "$ipath/$iname.ts"
+    set tfile "$tpath/$tname.ts"
+    set status [$ts get status]
+
+    # Open recording to lock against Auto and Flatten
+    set recording [open $file r]
+    if {($stime +$delsec) > $ctime} {
+            log  "Waiting for recording $delsec seconds" 1
+            sleep $($stime +$delsec- $ctime)
+            set ctime [clock seconds]
+       }
+
+    if {![acquire_lock $file]} {
+           log "Cannot acquire exclusive lock $file, terminating." 0
+           return {"DEFER" "Cannot acquire exclusive lock"}
+    }
+
+    set start [clock milliseconds]
+    log "starting" 2
+
+    # Create links to input in tmp for retrieval
+    file delete -force "$ipath/$iname.ts"
+    catch {file link -hard "$ipath/$iname.ts" "[file normalize [file rootname $file].ts]"}
+    file delete -force "$ipath/$iname.nts"
+    catch {file link -hard "$ipath/$iname.nts" "[file normalize [file rootname $file].nts]"}
+    file delete -force "$ipath/$iname.hmt"
+    catch {file link -hard "$ipath/$iname.hmt" "[file normalize [file rootname $file].hmt]"}
+    set its [ts fetch $ifile]
+
+
+    # Use link for .nts so updates are visble
+    file delete -force "$tpath/$tname.nts"
+    catch {file link -hard "$tpath/$tname.nts" "[file normalize [file rootname $file].nts]"}
+
+    # Copy sidecar files and update program title, encryption flag
+    file copy -force "[file rootname $file].hmt" "$tpath/$tname.hmt"
+    # Update output hmt to valid, decrypted, ad-detected empty file
+    set title [$ts get title]
+    set guidance [$ts get guidance]
+    exec hmt "-encrypted"  "$tpath/$tname.hmt"
+    exec hmt "-protect"  "$tpath/$tname.hmt"
+    exec hmt "+patch8=0x28c:2"  "$tpath/$tname.hmt"
+
+    set ftime [clock format $stime -format "%Y%m%d%H%M.%S"]
+    exec touch  $tfile -t $ftime
+    set tts [ts fetch $tfile]
+    #set tfilesize [file size  $tfile]  ;# Restart point
+    set tfilesize 0  ;# Silence/nsplice cant handle restart midway so force total file retrieval
+
+    set newtitle [concat $title  "-Decrypt"]
+    exec hmt  "+settitle=${newtitle}" "$tpath/$tname.hmt"
+
+    exec  /mod/bin/chaseget $ifile $tfilesize > $tfile
+
+    # Delete links to input from /mod/tmp
+    $its delete
+
+    # Check that complete file has been retrieved & detected
+    set ts [ts fetch $file]
+    set tfilesize [file size $tfile]
+    set filesize  [file size $file]
+    set missing $($filesize -$tfilesize)
+    set lengtherr 0
+    set stime [$ts get start]
+    set etime [$ts get end]
+    set durn $($etime-$stime)
+    set misstime $(round(abs($missing)/($filesize/$durn)))
+
+    # Recopy hmt to get completion details
+    file copy -force "[file rootname $file].hmt" "$tpath/$tname.hmt"
+    # Update output hmt to valid, decrypted, nonprotected file
+    exec hmt "-encrypted"  "$tpath/$tname.hmt"
+    exec hmt "-protect"  "$tpath/$tname.hmt"
+    exec hmt  "+settitle=${newtitle}" "$tpath/$tname.hmt"
+
+    set newtitle $title
+    if {$missing != 0} {
+        # Length error in decryption
+        set lengtherr 1
+        set warning "Incomplete data retrieval $missing bytes missing ([clock format $misstime -format %T])"
+        log "$file $warning" 0
+        set newtitle  "$title -Len err ([clock format $misstime -format %T])"
+        exec hmt  "+settitle=$newtitle" "$tpath/$tname.hmt"
+        if {$misstime >= $misrdsec} {
+            # system notify "ChaseDecrypt $file $warning"
+        } else {
+            # ignore the problem
+            set lengtherr 0
+        }
+    }
+
+    if {$lengtherr == 0} {
+        # All OK (as far as we can tell)
+        close $recording
+
+        if {$delorig && ![system inuse $file]} { # Delete original file no longer wanted
+            if {$delorig == 2} {
+                set del [$ts delete]
+                log "file $file deleted, code $del" 1
+            } else {
+                set del [safe_delete $file chasedecrypt]
+                log "$file dustbinned, code $del" 2
+            }
+            if {$del && ![system inuse $tfile]} {  # Rename decrypt file to original if not in use
+               exec hmt  "+settitle=$newtitle" "$tpath/$tname.hmt"
+               ts renamegroup "$tpath/$tname.ts" "$bname"
+               log "$tname renamed $bname" 1
+            }
+        } else {  # Keeping original, dont rename
+        }
+    } else {
+            # Somethings amiss with file length, keep original and delete  -dec
+            if {![system inuse $tfile]}  {
+                [safe_delete $tfile chasedecrypt]
+                log "$tfile dustbinned" 2
+            }
+            close $recording
+    }
+
+    #set elapsedSeconds [elapsed $start]
+    #set elapsedTime [clock format $(round($elapsedSeconds)) -format "%H:%M:%S"]
+    #log "done...processed $file in ${elapsedSeconds}s $elapsedTime " 0
+    log "done...processed $file" 0
+
+    system endop $statustok
+    release_lock $file
+    log "=============================================================" 1
+    return
+}
+

@@ -1,0 +1,6 @@
+
+# Override options must be specified on the first line of this file above
+Option      Default (unless changed in Settings)
+-d               = produce detailed debug on Stdout
+-delSec     180  = Delay start of chaserun processing until n seconds after recording begins
+

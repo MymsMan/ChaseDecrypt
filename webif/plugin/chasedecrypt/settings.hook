@@ -1,0 +1,78 @@
+#source /mod/webif/lib/setup
+#require  settings.class
+#set settings [settings]
+
+set ::chasedecrypt::delorig [$settings _nval_setting "chasedecrypt_delorig"]
+
+set ::chasedecrypt::otheropts [$settings _tval_setting "chasedecrypt_otheropts"]
+if {$::chasedecrypt::otheropts == 0} {set ::chasedecrypt::otheropts ""}
+
+puts "
+    <fieldset style=\"display: inline\">
+    <legend>
+        <a href=\"http://wiki.hummy.tv/wiki/ChaseDecrypt\" target=\"_blank\"><img src=\"/plugin/chasedecrypt/img/chasedecrypt.png\" alt=\"ChaseDecrypt icon\"/>  Chase decrypt recording</a>
+    </legend>
+    <p>See <b><a href=\"http://wiki.hummy.tv/wiki/ChaseDecrypt\" target=\"_blank\">ChaseDecrypt user guide</a></b> for help</p>
+    <form class=auto id=chasedecrypt method=get
+        action=/plugin/chasedecrypt/save.jim>
+    <table>"
+puts "
+    <!--  Channel inclusion based on ChannelDel package
+    -->
+    <tr>
+        <th class=key>Select channels for Chase decryption
+        </th>
+
+        <td><button id=chasedecrypt_incl type=button>Edit list</button>
+        </td>
+    </tr>"
+
+puts "
+    <tr id=chasedecrypt_delorig class=dahide>
+        <th class=key>Original recording
+        </th>
+        <td><input name=chasedecrypt_delorig
+            type=radio value=0"
+if {$::chasedecrypt::delorig eq 0} { puts -nonewline " checked" }
+puts "> Keep
+        </td>
+        <td><input name=chasedecrypt_delorig
+            type=radio value=1"
+if {$::chasedecrypt::delorig eq 1} { puts -nonewline " checked" }
+puts "> Move to bin
+        </td>
+        <td><input name=chasedecrypt_delorig
+            type=radio value=2"
+if {$::chasedecrypt::delorig eq 2} { puts -nonewline " checked" }
+puts "> Delete
+        </td>
+    </tr>"
+puts "
+    <tr>
+        <th class=key><a href=\"http://wiki.hummy.tv/wiki/ChaseDecrypt#Options\" target=\"_blank\">Other options</a>
+        </th>
+        <td colspan=4><input id=chasedecrypt_otheropts name=chasedecrypt_otheropts
+            class=\"ui-widget-content ui-corner-all\"
+            type=text size=100 value=\"$::chasedecrypt::otheropts\">
+        </td>
+    </tr>"
+puts "
+    <tr>
+        <td colspan=2><input type=submit value=\"Update settings\">
+            <div id=chasedecrypt_output></div>
+        </td>
+    </tr>
+    </table>
+    </form>
+    </fieldset>
+    "
+puts {
+<!-- Channel inclusion based on ChannelDel package
+-->
+<script>
+    $('#chasedecrypt_incl').button().click(function() {
+    window.location.href = '/plugin/chasedecrypt/settings.jim';
+    })
+</script>
+}
+

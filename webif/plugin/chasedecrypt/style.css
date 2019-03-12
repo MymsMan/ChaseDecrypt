@@ -1,0 +1,39 @@
+div.col, div.ocol
+{
+    float: left;
+    margin: 5px;
+    padding: 5px;
+    text-align: center;
+}
+
+#save
+{
+    clear: left;
+    float: left;
+}
+
+div.col
+{
+    border: 1px solid grey;
+    width: 20%;
+}
+div.ocol
+{
+    border: 0;
+    width: 5%;
+}
+select.chanlist
+{
+    multiple: multiple;
+    width: 100%
+}
+img.arrow
+{
+    border: 0;
+    height: 20px;
+}
+button
+{
+    margin-bottom: 0.5em;
+}
+

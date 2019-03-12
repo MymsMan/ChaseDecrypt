@@ -1,0 +1,18 @@
+#!/mod/bin/jimsh
+
+package require cgi
+source /mod/webif/lib/setup
+require settings.class
+
+httpheader
+
+
+set delorig [cgi_get chasedecrypt_delorig 0]
+set otheropts [cgi_get chasedecrypt_otheropts ""]
+
+[settings new] _nval_setting "chasedecrypt_delorig" $delorig
+
+[settings new] _tval_setting "chasedecrypt_otheropts" $otheropts
+
+puts "Settings saved."
+

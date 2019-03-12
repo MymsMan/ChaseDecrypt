@@ -1,0 +1,91 @@
+#!/mod/bin/jimsh
+
+package require cgi
+source /mod/webif/lib/setup
+require system.class epg.class
+
+jqplugin form
+jscss settings.js style.css
+header
+
+# cloned from channeldel package - mymsman 150331
+set cf "/mod/etc/chasedecrypt.conf"
+
+if {![file exists $cf]} {
+    file copy /mod/webif/plugin/chasedecrypt/default.conf $cf
+}
+
+
+if {![catch {set fp [open $cf r]}]} {
+    set clist [split [read $fp] "\n"]
+} else {
+    set clist {}
+}
+
+set channels {}
+lmap i [$channeldb query "
+    select usLcn, szSvcName
+    from TBL_SVC
+"] { set channels([lindex $i 1]) [string range [lindex $i 3] 1 end] }
+
+puts {
+<fieldset id=chasedecrypt width=100%>
+<legend><a href="http://wiki.hummy.tv/wiki/ChaseDecrypt" target=\"_blank\"><img src="/plugin/chasedecrypt/img/chasedecrypt.png" alt="ChaseDecrypt icon"/>  ChaseDecrypt Channel Inclusion Settings</a></legend>
+
+    <p>See <b><a href="http://wiki.hummy.tv/wiki/ChaseDecrypt" target=\"_blank\">ChaseDecrypt user guide</a></b> for help</p>
+<form method=post action=savelist.jim id=excsave>
+<button id=save type=submit>Save Changes</button>
+<button id=back type=button>Return to settings</button>
+<div id=saveresults class=blood
+    style="float: left; font-style: italic; padding: 0.5em 1em"></div>
+
+<div class=col style="clear: left" id=autoexc>
+Include channels
+(Wildcards are supported using *)
+}
+puts -nonewline "<textarea name=clist id=exclist rows=40 cols=20
+    class=\"ui-widget ui-corner-all\">"
+foreach chan $clist {
+    if {![string length $chan]} continue
+    puts $chan
+}
+puts {</textarea>
+</div>
+</form>
+
+<div class=ocol id=Add>
+<button class=move><img class=arrow src=/img/left.png></button>
+</div>
+
+<div class=col id=channels>
+Channels
+}
+puts "
+<select id=chanlist name=chanlist size=[expr [llength $channels] / 2]
+            class=\"chanlist ui-widget-content ui-corner-all\"
+            multiple=multiple>
+"
+foreach lcn [lsort -integer [array names channels]] {
+    if {$lcn == 0} continue
+    if {$channels($lcn) in $clist} continue
+    set flag 0
+    catch {
+        foreach c $clist {
+            if {[string match -nocase $c $channels($lcn)]} {
+                set flag 1
+                break
+            }
+        }
+    }
+    if {$flag} continue
+    puts "<option value=\"$channels($lcn)\">$lcn - $channels($lcn)"
+}
+puts {
+</select>
+</div>
+
+</fieldset>
+}
+
+footer
+

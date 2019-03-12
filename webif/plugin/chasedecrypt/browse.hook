@@ -1,0 +1,9 @@
+
+jscss /plugin/chasedecrypt/browse.js /plugin/chasedecrypt/browse.css
+
+
+#lappend plugins(menu) {chasedecrypt {desc "Detect Adverts"}}
+
+lappend plugins(dmenu) {chasedecrypt {desc "Toggle ChaseDecrypt"}}
+#lappend plugins(dmenu) {editchasedecrypt {desc "Edit ChaseDecrypt options"}}
+#lappend plugins(dmenu) {nochasedecrypt {desc "Toggle No ChaseDecrypt"}}

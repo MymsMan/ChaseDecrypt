@@ -1,0 +1,33 @@
+#!/mod/bin/jimsh
+
+# cloned from channeldel package - mymsman 150331
+package require sqlite3
+package require cgi
+source /mod/webif/lib/setup
+
+set cf "/mod/etc/chasedecrypt.conf"
+
+httpheader
+
+set clist [cgi_get clist ""]
+
+if {![string length $clist]} {
+    set clist " "
+}
+
+if {[catch {set fp [open $cf w]} msg]} {
+    puts "ERROR: $msg"
+    exit
+}
+
+foreach line [split $clist "\n"] {
+    # Strip leading and trailing whitespace
+    regsub -all -- {^[[:space:]]+} $line "" line
+    regsub -all -- {[[:space:]]+$} $line "" line
+    if {![string length $line]} continue
+    puts $fp $line
+}
+$fp close
+
+puts "Chasedecrypt channel list saved successfully."
+
